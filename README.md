@@ -46,6 +46,7 @@ Uses a SentenceTransformer model to compute embeddings and retrieve the most sem
 
 ## II. Project Structure
 
+/demo1-V2
 ├── core/
 |    ├── text_extractor.py
 |    ├── llm_analyzer.py
