@@ -45,16 +45,26 @@ Filter by:
 Uses a SentenceTransformer model to compute embeddings and retrieve the most semantically similar documents.
 
 ## II. Project Structure
-Code
-core/
-│
-├── text_extractor.py
-├── llm_analyzer.py
-├── ml_classifier.py
-├── database.py
-├── embedding_helper.py
-├── search.py
-└── config.py
+
+├── core/
+|    ├── text_extractor.py
+|    ├── llm_analyzer.py
+|    ├── ml_classifier.py
+|    ├── database.py
+|    ├── embedding_helper.py
+|    ├── search.py
+|    └── config.py
+├── models/
+|    ├── modele_ml_lr.joblib
+|    ├── movies_database.csv
+|    ├── train_ml_model.py
+|    └── vectorizer2.joblib
+├── .gitignore
+├── README.md
+├── main_en.py
+├── main_en_search.py
+├── requirements.txt
+└── test_HarryPotter1.docx
 
 app.py  (Streamlit main app)
 database.csv
