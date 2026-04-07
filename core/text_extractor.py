@@ -28,6 +28,9 @@ def extract_text(uploaded_file):
             for row in ws.iter_rows(values_only=True):
                 texte += " ".join([str(c) for c in row if c]) + "\n"
         return texte
+    
+    if ext=="txt":
+        return uploaded_file.read().decode("utf-8", errors="ignore")
 
     else:
         raise ValueError(f"Unsupported file type: {suffix}")
