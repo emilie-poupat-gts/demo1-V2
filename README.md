@@ -67,6 +67,10 @@ Uses a SentenceTransformer model to compute embeddings and retrieve the most sem
 ├── requirements.txt
 └── test_HarryPotter1.docx
 
+
+In the .gitignore, there is the folder *ModelHF*. It's the model Hugging Face used for the semantic search. It's in a folder because the VM doesn't have access to internet so to the Hugging Face's models, we have to put it in a folder. 
+==> In an environment that has access to internet, we can directly call the Hugging Face's model : *sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2*.
+
 ## III. Running the App
 bash >> streamlit run app.py
 
