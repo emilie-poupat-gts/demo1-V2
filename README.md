@@ -72,7 +72,11 @@ In the .gitignore, there is the folder *ModelHF*. It's the model Hugging Face us
 ==> In an environment that has access to internet, we can directly call the Hugging Face's model : *sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2*.
 
 ## III. Running the App
-bash >> streamlit run app.py
+bash >> streamlit run main_en.py (for the main_en.py demo)
+bash >> streamlit run main_en_search.py (for the main_en_search.py demo)
+
+If in a venv :
+bash (venv) >> python -m streamlit run <file>.py
 
 ## IV. Requirements
 Python 3.9+
