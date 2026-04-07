@@ -67,10 +67,6 @@ Uses a SentenceTransformer model to compute embeddings and retrieve the most sem
 ├── requirements.txt
 └── test_HarryPotter1.docx
 
-app.py  (Streamlit main app)
-database.csv
-modelHF/  (SentenceTransformer model)
-
 ## III. Running the App
 bash >> streamlit run app.py
 
