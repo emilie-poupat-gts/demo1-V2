@@ -5,24 +5,31 @@ from core.text_extractor import extract_text
 from core.llm_analyzer import analyze_with_llm
 from core.ml_classifier import classify
 from core.database import load_database, add_entry
-from core.search import (
-    lexical_search,
-    combined_search,
-    semantic_search
-)
+from core.search import lexical_search, combined_search, semantic_search
 from core.config import llm, clf, vectorizer
 
+from sentence_transformers import SentenceTransformer
+
 
 # ---------------------------------------------------------
-# INTERFACE CONFIGURATION
+# STREAMLIT CONFIG
 # ---------------------------------------------------------
-st.set_page_config(
-    page_title="Document tool",
-    layout="wide"
-)
-
+st.set_page_config(page_title="Document tool", layout="wide")
 st.title("Document tool — contribution & search")
 st.markdown("RETEX Project — POC1 — Phase 1")
+
+
+# ---------------------------------------------------------
+# CACHE MODELS & EMBEDDINGS
+# ---------------------------------------------------------
+@st.cache_resource
+def load_st_model():
+    return SentenceTransformer("./modelHF")
+
+@st.cache_data
+def compute_embeddings(descriptions):
+    model = load_st_model()
+    return model.encode(descriptions)
 
 
 # ---------------------------------------------------------
@@ -35,16 +42,13 @@ mode = st.sidebar.radio(
     "Choose a mode:",
     [
         " Show database",
-        " Analyze a document",
-        " Lexical search",
-        " Combined search (with filters)",
-        " Semantic search"
+        " Add a document"
     ]
 )
 
 
 # ---------------------------------------------------------
-# RESULT DISPLAY FUNCTION
+# RESULT DISPLAY
 # ---------------------------------------------------------
 def display_results(results):
     if results.empty:
@@ -60,12 +64,11 @@ def display_results(results):
 
 
 # ---------------------------------------------------------
-# MODE 1 — DOCUMENT ANALYSIS
+# MODE 1 — ADD DOCUMENT
 # ---------------------------------------------------------
-if mode == " Analyze a document":
-    st.header("Document analysis")
+if mode == " Add a document":
+    st.header("Analysis and addition of documents in the database")
 
-    # Initialize session database
     if "df" not in st.session_state:
         st.session_state.df = load_database()
 
@@ -80,7 +83,7 @@ if mode == " Analyze a document":
     if uploaded_file is not None:
         if st.button("Analyze and add to database"):
 
-            # Text extraction
+            # 1. FAST TEXT EXTRACTION
             with st.spinner("Extracting text..."):
                 try:
                     extracted_text = extract_text(uploaded_file)
@@ -89,7 +92,8 @@ if mode == " Analyze a document":
                     extracted_text = None
 
             if extracted_text:
-                # LLM analysis
+
+                # 2. FAST LLM ANALYSIS (SUMMARIZATION + SINGLE EXTRACTION)
                 with st.spinner("Analyzing with LLM..."):
                     try:
                         llm_data = analyze_with_llm(extracted_text, llm)
@@ -101,7 +105,7 @@ if mode == " Analyze a document":
                     st.subheader("LLM Extracted Data:")
                     st.json(llm_data)
 
-                    # ML arbitration
+                    # 3. ML ARBITRATION
                     with st.spinner("Comparing with ML model..."):
                         desc_vec = vectorizer.transform([llm_data['description']])
                         probas = clf.predict_proba(desc_vec)[0]
@@ -110,7 +114,6 @@ if mode == " Analyze a document":
 
                         llm_category = llm_data['category']
                         final_category = llm_category
-                        explanation = ""
 
                         if llm_category == ml_pred_category:
                             explanation = (
@@ -130,7 +133,6 @@ if mode == " Analyze a document":
                                     f"Final category: **{ml_pred_category}**"
                                 )
                             else:
-                                final_category = llm_category
                                 explanation += (
                                     f"ML is not confident ({max_proba:.2f}). "
                                     f"Keeping LLM category: **{llm_category}**"
@@ -138,7 +140,7 @@ if mode == " Analyze a document":
 
                         st.info(explanation)
 
-                    # Add to database
+                    # 4. ADD TO DATABASE
                     new_entry = {
                         "title": llm_data["title"],
                         "description": llm_data["description"],
@@ -148,16 +150,14 @@ if mode == " Analyze a document":
                     }
 
                     st.session_state.df = add_entry(st.session_state.df, new_entry)
-
                     st.success(f"The document **{llm_data['title']}** has been added to the database!")
 
             else:
                 st.error("Unable to extract text from this document.")
 
 
-
 # ---------------------------------------------------------
-# MODE 2 — DATABASE
+# MODE 2 — SHOW DATABASE
 # ---------------------------------------------------------
 elif mode == " Show database":
     st.header("Database")
@@ -169,7 +169,6 @@ elif mode == " Show database":
 # ---------------------------------------------------------
 elif mode == " Lexical search":
     st.header("Lexical search")
-
     query = st.text_input("Type a word or sentence")
 
     if query:
@@ -208,10 +207,8 @@ elif mode == " Combined search (with filters)":
 elif mode == " Semantic search":
     st.header("Semantic search")
 
-    from sentence_transformers import SentenceTransformer
-
-    model = SentenceTransformer("./modelHF")
-    embeddings_db = model.encode(df["description"].tolist())
+    model = load_st_model()
+    embeddings_db = compute_embeddings(df["description"].tolist())
 
     query = st.text_input("Describe what you are looking for")
 

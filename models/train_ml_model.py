@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 df = pd.read_csv("./src/movies_database.csv")
 
 X_text = df["description"]
-y = df["categorie"]
+y = df["category"]
 
 # ---------------------------------------------------------
 # 2. Split train/test
@@ -62,9 +62,9 @@ clf.fit(X_train_vec, y_train)
 y_pred = clf.predict(X_test_vec)
 
 accuracy = accuracy_score(y_test, y_pred)
-print("\n🎯 Accuracy :", round(accuracy, 3))
+print("\nAccuracy :", round(accuracy, 3))
 
-print("\n📊 Classification Report :")
+print("\nClassification Report :")
 print(classification_report(y_test, y_pred))
 
 # ---------------------------------------------------------
@@ -90,7 +90,7 @@ plt.show()
 # ---------------------------------------------------------
 # 7. Sauvegarde du modèle et du vectorizer
 # ---------------------------------------------------------
-joblib.dump(clf, "modele_ml_lr.joblib")
-joblib.dump(vectorizer, "vectorizer2.joblib")
+joblib.dump(clf, "./models/modele_ml_lr.joblib")
+joblib.dump(vectorizer, "./models/vectorizer2.joblib")
 
 print("\Modèle et vectorizer sauvegardés.")
