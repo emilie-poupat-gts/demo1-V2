@@ -29,4 +29,4 @@ CATEGORIES = [
     "Horreur"
 ]
 
-CSV_PATH = "models/movies_database.csv"
+CSV_PATH = "src/movies_database.csv"

@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 # ---------------------------------------------------------
 # 1. Chargement du dataset
 # ---------------------------------------------------------
-df = pd.read_csv("movies_database.csv")
+df = pd.read_csv("./src/movies_database.csv")
 
 X_text = df["description"]
 y = df["categorie"]
