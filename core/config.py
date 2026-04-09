@@ -4,7 +4,7 @@ from langchain_openai import ChatOpenAI
 # Modèle LLM local (Ollama API compatible OpenAI)
 OPENAI_BASE_URL = "http://localhost:11434/v1"
 OPENAI_API_KEY = "ollama"
-GENERATOR_MODEL_NAME = "llama3.1:70b"
+GENERATOR_MODEL_NAME = "qwen2.5:14b"
 
 llm = ChatOpenAI(
     model=GENERATOR_MODEL_NAME,
