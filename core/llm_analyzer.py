@@ -16,17 +16,17 @@ def analyze_with_llm(text, llm):
 
     for chunk in chunks:
         prompt = f"""
-Tu es un assistant spécialisé en cinéma. Analyse le texte suivant et extrais les métadonnées d'un film.
-Tu DOIS répondre UNIQUEMENT au format JSON valide. Aucun texte avant ou après.
-La catégorie doit être dans : {CATEGORIES}.
-Si l'année est introuvable, mets "0000".
+You are an assistant specialized in cinema. Analyze the following text and extract the metadata of a movie.
+You MUST respond ONLY in valid JSON format. No text before or after.
+The category must be one of : {CATEGORIES}.
+If the year can't be found, use "OOOO".
 
-Format attendu :
+Expected format:
 {{
-    "title": "Titre du film",
-    "description": "Résumé clair en une phrase",
-    "keywords": ["mot1", "mot2"],
-    "category": "Catégorie",
+    "title": "Title of the movie",
+    "description": "Short and pertinent description of the movie in 1 sentence",
+    "keywords": ["word1", "word2"],
+    "category": "Category",
     "year": 2020
 }}
 
@@ -58,3 +58,12 @@ Text :
     }
 
     return fusion
+
+def rag_answer_with_llm(prompt, llm):
+    """
+    LLM call for RAG question answering.
+    No JSON, no metadata extraction.
+    """
+    response = llm.invoke(prompt)
+    return response.content
+
