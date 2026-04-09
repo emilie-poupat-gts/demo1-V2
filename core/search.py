@@ -1,172 +1,280 @@
+import streamlit as st
 import pandas as pd
-import re
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
+import faiss
+import time
 
 
-# ---------------------------------------------------------
-# LEXICAL SEARCH
-# ---------------------------------------------------------
-def lexical_search(df, query):
-    """Simple keyword-based search."""
-    query = query.lower()
-    mask = (
-        df["title"].str.contains(query, case=False, na=False) |
-        df["description"].str.contains(query, case=False, na=False) |
-        df["keywords"].str.contains(query, case=False, na=False) |
-        df["category"].str.contains(query, case=False, na=False)
-    )
-    return df[mask]
+from sentence_transformers import SentenceTransformer
 
-
-# ---------------------------------------------------------
-# COMBINED SEARCH
-# ---------------------------------------------------------
-def combined_search(df, categories, years, keywords):
-    """Filter by category, year range, and keywords."""
-    results = df.copy()
-
-    if categories:
-        results = results[results["category"].isin(categories)]
-
-    if years:
-        min_year, max_year = years
-        results = results[(results["year"] >= min_year) & (results["year"] <= max_year)]
-
-    if keywords:
-        for kw in keywords:
-            results = results[results["keywords"].str.contains(kw, case=False, na=False)]
-
-    return results
-
+from core.text_extractor import extract_text
+from core.llm_analyzer import analyze_with_llm, rag_answer_with_llm
+from core.ml_classifier import classify
+from core.database import load_database, add_entry
+from core.search import (
+    lexical_search,
+    combined_search,
+    semantic_search_with_year_range
+)
+from core.embedding_helper import (
+    compute_embeddings  # NOTE: we no longer import load_model from here
+)
+from core.config import llm, clf, vectorizer
+from core.rag import (
+    build_rag_prompt  # we’ll build docs directly here
+)
 
 # ---------------------------------------------------------
-# SEMANTIC SEARCH
+# INTERFACE CONFIGURATION
 # ---------------------------------------------------------
-def semantic_search(df, query, model, embeddings_db, top_k=10):
-    """Semantic search using sentence-transformer embeddings."""
-    query_embedding = model.encode([query])
-    similarities = cosine_similarity(query_embedding, embeddings_db)[0]
+st.set_page_config(
+    page_title="Document tool",
+    layout="wide"
+)
 
-    df["similarity"] = similarities
-    results = df.sort_values(by="similarity", ascending=False).head(top_k)
+st.title("Document tool — contribution & search")
+st.markdown("RETEX Project — POC1 — Phase 1")
 
-    return results.drop(columns=["similarity"])
+# ---------------------------------------------------------
+# LOAD DATABASE
+# ---------------------------------------------------------
+df = load_database()
 
-# -----------------------------------------------------
-# SEMANTIC SEARCH WITH YEAR RANGE
-# ----------------------------------------------------
-def parse_year_filter(query):
-    """
-    Returns (min_year, max_year, reason) where min_year or max_year can be None.
-    Semantics:
-      - "from 2000", "since 2000" -> min_year = 2000 (inclusive)
-      - "after 2000" -> min_year = 2001 (strictly after)
-      - "before 2000", "until 2000", "up to 2000" -> max_year = 1999 (strictly before) or <=2000 depending on phrase
-      - "<=2000" or "up to 2000" -> max_year = 2000 (inclusive)
-      - "between 2000 and 2005", "2000-2005", "2000 to 2005" -> inclusive range
-      - "2000s" -> 2000..2009
-      - "in 2000", "movie 2000" -> exact year (min=max=2000)
-    """
-    q = query.lower()
+st.sidebar.header("Main menu")
+mode = st.sidebar.radio(
+    "Choose a mode:",
+    [
+        " Show database",
+        " Lexical search",
+        " Combined search (with filters)",
+        " Semantic search",
+        "RAG"
+    ]
+)
 
-    # decade "2000s"
-    m = re.search(r"\b(19|20)\d{2}s\b", q)
-    if m:
-        start = int(m.group(0)[:4])
-        return start, start + 9, "decade"
+# ---------------------------------------------------------
+# CACHED MODEL, EMBEDDINGS & FAISS INDEX
+# ---------------------------------------------------------
+@st.cache_resource
+def get_embedding_model(path: str = "./modelHF"):
+    """Load and cache the SentenceTransformer model."""
+    return SentenceTransformer(path)
 
-    # explicit range "2000-2005" or "2000 to 2005" or "between 2000 and 2005"
-    m = re.search(r"\b(19\d{2}|20\d{2})\s*[-–]\s*(19\d{2}|20\d{2})\b", q)
-    if m:
-        return int(m.group(1)), int(m.group(2)), "range-dash"
-    m = re.search(r"\bbetween\s+(19\d{2}|20\d{2})\s+(?:and|-|to)\s+(19\d{2}|20\d{2})\b", q)
-    if m:
-        return int(m.group(1)), int(m.group(2)), "between"
+@st.cache_resource
+def get_db_embeddings(df: pd.DataFrame):
+    """Compute and cache embeddings for the whole database."""
+    model = get_embedding_model("./modelHF")
+    cols_to_use = ["title", "keywords", "description", "category"]
+    embeddings = compute_embeddings(df, cols_to_use, model, batch_size=64)
+    return embeddings
 
-    # "from 2000", "since 2000" -> inclusive
-    m = re.search(r"\b(?:from|since)\s+(19\d{2}|20\d{2})\b", q)
-    if m:
-        return int(m.group(1)), None, "from/since"
+@st.cache_resource
+def get_faiss_index(embeddings: np.ndarray):
+    """Build and cache a FAISS index over the embeddings."""
+    dim = embeddings.shape[1]
+    index = faiss.IndexFlatIP(dim)
+    index.add(embeddings.astype("float32"))
+    return index
 
-    # "after 2000" -> strictly greater
-    m = re.search(r"\bafter\s+(19\d{2}|20\d{2})\b", q)
-    if m:
-        return int(m.group(1)) + 1, None, "after"
+# ---------------------------------------------------------
+# RESULT DISPLAY FUNCTIONS
+# ---------------------------------------------------------
+def display_results_semantic(results: pd.DataFrame):
+    if results.empty:
+        st.warning("No results found")
+        return
 
-    # "before 2000" -> strictly less
-    m = re.search(r"\bbefore\s+(19\d{2}|20\d{2})\b", q)
-    if m:
-        return None, int(m.group(1)) - 1, "before"
+    st.success(f"{len(results)} result(s) found")
 
-    # "until 2000" or "up to 2000" -> inclusive <=2000
-    m = re.search(r"\b(?:until|up to|<=)\s*(19\d{2}|20\d{2})\b", q)
-    if m:
-        return None, int(m.group(1)), "until/up to"
+    for _, row in results.iterrows():
+        with st.expander(f"**{row['title']}** ({row['year']}) — {row['category']} "):
+            st.write(f"**Match score:** `{row['score']:.4f}`")
+            st.write(f"**Description:** {row['description']}")
+            st.write(f"**Keywords:** {row['keywords']}")
 
-    # comparison operators like >=2000, >2000, <=2000, <2000
-    m = re.search(r"\b(>=|<=|>|<)\s*(19\d{2}|20\d{2})\b", q)
-    if m:
-        op, y = m.group(1), int(m.group(2))
-        if op == ">":
-            return y + 1, None, ">"
-        if op == ">=":
-            return y, None, ">="
-        if op == "<":
-            return None, y - 1, "<"
-        return None, y, "<="
+def display_results_classic(results: pd.DataFrame):
+    if results.empty:
+        st.warning("No results found")
+        return
 
-    # "in 2000" or single year with context words -> treat as exact year
-    m = re.search(r"\bin\s+(19\d{2}|20\d{2})\b", q)
-    if m:
-        y = int(m.group(1))
-        return y, y, "in"
+    st.success(f"{len(results)} result(s) found")
 
-    # multiple years or single year tokens
-    years = re.findall(r"\b(19\d{2}|20\d{2})\b", q)
-    if len(years) == 1:
-        # if query contains "from" treat as from-year
-        if re.search(r"\bfrom\b", q):
-            return int(years[0]), None, "single-from"
-        # default: exact match
-        y = int(years[0])
-        return y, y, "single-exact"
-    if len(years) > 1:
-        ys = sorted(int(y) for y in years)
-        return ys[0], ys[-1], "multiple-years"
+    for _, row in results.iterrows():
+        with st.expander(f"**{row['title']}** ({row['year']}) — {row['category']} "):
+            st.write(f"**Description:** {row['description']}")
+            st.write(f"**Keywords:** {row['keywords']}")
 
-    return None, None, None
+# ---------------------------------------------------------
+# FAST RAG RETRIEVAL USING FAISS
+# ---------------------------------------------------------
+def rag_retrieve_fast(query: str, model, index, df: pd.DataFrame, top_k: int = 8):
+    """Retrieve top_k documents using FAISS index."""
+    q_emb = model.encode([query])
+    scores, idx = index.search(q_emb, top_k)
 
-def semantic_search_with_year_range(df, query, model, embeddings_db, top_k=10, fallback_to_full=True):
-    min_year, max_year, reason = parse_year_filter(query)
+    retrieved_rows = []
+    for i, score in zip(idx[0], scores[0]):
+        row = df.iloc[i]
+        retrieved_rows.append((row, float(score)))
+    return retrieved_rows
 
-    if min_year is not None or max_year is not None:
-        # build inclusive mask
-        if min_year is None:
-            mask = df["year"] <= max_year
-        elif max_year is None:
-            mask = df["year"] >= min_year
-        else:
-            mask = (df["year"] >= min_year) & (df["year"] <= max_year)
+def build_rag_documents_from_rows(retrieved_rows):
+    """Turn retrieved rows into text snippets for the RAG prompt."""
+    docs = []
+    for row, score in retrieved_rows:
+        doc_text = (
+            f"Title: {row['title']}\n"
+            f"Year: {row['year']}\n"
+            f"Category: {row['category']}\n"
+            f"Keywords: {row['keywords']}\n"
+            f"Description: {row['description']}\n"
+        )
+        docs.append(doc_text)
+    return docs
 
-        if not mask.any():
-            if fallback_to_full:
-                st.warning(f"No items match the year filter ({reason}). Falling back to full search.")
-                candidate_df = df.reset_index(drop=True)
-                candidate_embeddings = embeddings_db
-            else:
-                return pd.DataFrame(columns=list(df.columns) + ["score"])
-        else:
-            candidate_idx = np.where(mask)[0]
-            candidate_df = df.iloc[candidate_idx].reset_index(drop=True)
-            candidate_embeddings = embeddings_db[candidate_idx]
-    else:
-        candidate_df = df.reset_index(drop=True)
-        candidate_embeddings = embeddings_db
+# ---------------------------------------------------------
+# MODE 1 — DATABASE
+# ---------------------------------------------------------
+if mode == " Show database":
+    st.header("Database")
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
-    q_emb = model.encode(query, convert_to_numpy=True)
-    sims = cosine_similarity([q_emb], candidate_embeddings)[0]
-    top_local = np.argsort(sims)[::-1][:top_k]
-    results = candidate_df.iloc[top_local].copy()
-    results["score"] = sims[top_local]
-    return results.reset_index(drop=True)
+# ---------------------------------------------------------
+# MODE 2 — LEXICAL SEARCH
+# ---------------------------------------------------------
+elif mode == " Lexical search":
+    st.header("Lexical search")
+
+    if "df" not in st.session_state:
+        st.session_state.df = load_database()
+
+    with st.expander("View current database"):
+        st.dataframe(st.session_state.df, use_container_width=True, hide_index=True)
+
+    query = st.text_input("Type a word or sentence")
+
+    if query:
+        results = lexical_search(df, query)
+        display_results_classic(results)
+
+# ---------------------------------------------------------
+# MODE 3 — COMBINED SEARCH
+# ---------------------------------------------------------
+elif mode == " Combined search (with filters)":
+    st.header("Combined search")
+
+    if "df" not in st.session_state:
+        st.session_state.df = load_database()
+
+    with st.expander("View current database"):
+        st.dataframe(st.session_state.df, use_container_width=True, hide_index=True)
+
+    categories = sorted(df["category"].unique())
+    year_min, year_max = int(df["year"].min()), int(df["year"].max())
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        selected_categories = st.multiselect("Categories:", categories)
+
+    with col2:
+        selected_years = st.slider("Years:", year_min, year_max, (year_min, year_max))
+
+    keywords = st.text_input("Select keywords (separated by a comma):")
+    selected_keywords = sorted(list(set(",".join(keywords).split(",")))) if keywords else []
+
+    if st.button("Filter"):
+        results = combined_search(df, selected_categories, selected_years, selected_keywords)
+        display_results_classic(results)
+
+# ---------------------------------------------------------
+# MODE 4 — SEMANTIC SEARCH
+# ---------------------------------------------------------
+elif mode == " Semantic search":
+    st.header("Semantic search")
+
+    if "df" not in st.session_state:
+        st.session_state.df = load_database()
+
+    with st.expander("View current database"):
+        st.dataframe(st.session_state.df, use_container_width=True, hide_index=True)
+
+    model = get_embedding_model("./modelHF")
+    embeddings_db = get_db_embeddings(df)
+
+    query = st.text_input("Describe what you are looking for")
+
+    if query:
+        results = semantic_search_with_year_range(
+            df,
+            query,
+            model,
+            embeddings_db,
+            top_k=10,
+            fallback_to_full=True
+        )
+        display_results_semantic(results)
+
+# ---------------------------------------------------------
+# MODE 5 — RAG
+# ---------------------------------------------------------
+elif mode == "RAG":
+    st.header("RAG — Retrieval Augmented Generation")
+
+    query = st.text_input("Ask a question about the dataset")
+
+    if query:
+        progress = st.progress(0)
+        log = st.empty()
+
+        # STEP 1 — Load model
+        t0 = time.time()
+        model = get_embedding_model("./modelHF")
+        progress.progress(10)
+        log.write("Model loaded")
+
+        # STEP 2 — Load embeddings
+        embeddings_db = get_db_embeddings(df)
+        progress.progress(30)
+        log.write(f"Embeddings loaded in {time.time() - t0:.2f}s")
+
+        # STEP 3 — Load FAISS index
+        t1 = time.time()
+        index = get_faiss_index(embeddings_db)
+        progress.progress(50)
+        log.write(f"FAISS index ready in {time.time() - t1:.2f}s")
+
+        # STEP 4 — Retrieve documents
+        t2 = time.time()
+        retrieved_rows = rag_retrieve_fast(query, model, index, df, top_k=8)
+        progress.progress(70)
+        log.write(f"Retrieval done in {time.time() - t2:.2f}s")
+
+        # STEP 5 — Build RAG docs
+        t3 = time.time()
+        rag_docs = build_rag_documents_from_rows(retrieved_rows)
+        progress.progress(80)
+        log.write(f"Document formatting done in {time.time() - t3:.2f}s")
+
+        # STEP 6 — LLM call
+        t4 = time.time()
+        prompt = build_rag_prompt(query, rag_docs)
+        answer = rag_answer_with_llm(prompt, llm)
+        progress.progress(100)
+        log.write(f"LLM answered in {time.time() - t4:.2f}s")
+
+        st.subheader("Réponse du LLM")
+        st.write(answer)
+
+        with st.expander("Documents utilisés"):
+            for doc in rag_docs:
+                st.markdown(doc.replace("\n", "  \n"))
+
+        with st.expander("Debug timing"):
+            st.write({
+                "Model load": f"{t1 - t0:.2f}s",
+                "Embedding load": f"{t2 - t1:.2f}s",
+                "FAISS index": f"{t3 - t2:.2f}s",
+                "Retrieval": f"{t4 - t3:.2f}s",
+                "LLM call": f"{time.time() - t4:.2f}s",
+            })
