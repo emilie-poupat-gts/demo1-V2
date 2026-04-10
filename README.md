@@ -44,49 +44,49 @@ Filter by:
 ### 5. Semantic Search
 Uses a SentenceTransformer model to compute embeddings and retrieve the most semantically similar documents.
 
+### 6. RAG
+
+
 ## II. Project Structure
 
 /demo1-V2
 ├── core/
-|    ├── text_extractor.py
-|    ├── llm_analyzer.py
-|    ├── ml_classifier.py
+|    ├── config.py
 |    ├── database.py
 |    ├── embedding_helper.py
+|    ├── llm_analyzer.py
+|    ├── ml_classifier.py
+|    ├── rag.py
 |    ├── search.py
-|    └── config.py
+|    └── text_extractor.py
+├── main/
+|    ├── add.py
+|    └── search_RAG.py
 ├── models/
 |    ├── modele_ml_lr.joblib
-|    ├── movies_database.csv
 |    ├── train_ml_model.py
 |    └── vectorizer2.joblib
+├── src/
+|    ├── movies_database.csv
+|    └── test_HarryPotter1.docx
 ├── .gitignore
 ├── README.md
-├── main_en.py
-├── main_en_search.py
-├── requirements.txt
-└── test_HarryPotter1.docx
+└── requirements.txt
+
 
 
 In the .gitignore, there is the folder *ModelHF*. It's the model Hugging Face used for the semantic search. It's in a folder because the VM doesn't have access to internet so to the Hugging Face's models, we have to put it in a folder. 
 ==> In an environment that has access to internet, we can directly call the Hugging Face's model : *sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2*.
 
 ## III. Running the App
-bash >> streamlit run main_en.py (for the main_en.py demo)
-bash >> streamlit run main_en_search.py (for the main_en_search.py demo)
+bash >> streamlit run main/add.py (for the add.py demo)
+bash >> streamlit run main/search_RAG.py (for the search_RAG.py demo)
 
 If in a venv :
 bash (venv) >> python -m streamlit run <file>.py
 
 ## IV. Requirements
-Python 3.9+
-Streamlit
-pandas
-scikit-learn
-sentence-transformers
-pdfplumber
-python-docx
-python-pptx
+see the requirements.txt file
 
 📄 License
 MIT License.
