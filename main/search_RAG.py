@@ -151,7 +151,7 @@ elif mode == " Lexical search":
     with st.expander("View current database"):
         st.dataframe(st.session_state.df, use_container_width=True, hide_index=True)
 
-    query = st.text_input("Type a word or sentence")
+    query = st.text_input("Type a word or sentence", "sci-fi")
 
     if query:
         results = lexical_search(df, query)
@@ -202,7 +202,7 @@ elif mode == " Semantic search":
     model = get_embedding_model("./modelHF")
     embeddings_db = get_db_embeddings(df)
 
-    query = st.text_input("Describe what you are looking for")
+    query = st.text_input("Describe what you are looking for", "sci-fi after 2020")
 
     if query:
         results = semantic_search_with_year_range(
@@ -221,7 +221,7 @@ elif mode == " Semantic search":
 elif mode == "RAG":
     st.header("RAG — Retrieval Augmented Generation")
 
-    query = st.text_input("Ask a question about the dataset")
+    query = st.text_input("Ask a question about the dataset", "Are there any sci‑fi movies released before the year 2000?")
 
     if query:
         progress = st.progress(0)
@@ -263,10 +263,10 @@ elif mode == "RAG":
         progress.progress(100)
         log.write(f"LLM answered in {time.time() - t4:.2f}s")
 
-        st.subheader("Réponse du LLM")
+        st.subheader("LMM response")
         st.write(answer)
 
-        with st.expander("Documents utilisés"):
+        with st.expander("Documents used"):
             for doc in rag_docs:
                 st.markdown(doc.replace("\n", "  \n"))
 
