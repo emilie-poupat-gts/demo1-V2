@@ -221,7 +221,7 @@ elif mode == " Semantic search":
 elif mode == "RAG":
     st.header("RAG — Retrieval Augmented Generation")
 
-    query = st.text_input("Ask a question about the dataset", "Are there any sci‑fi movies released before the year 2000?")
+    query = st.text_input("Ask a question about the dataset", "Are there any sci‑fi movies released before 2000?")
 
     if query:
         progress = st.progress(0)
@@ -231,37 +231,37 @@ elif mode == "RAG":
         t0 = time.time()
         model = get_embedding_model("./modelHF")
         progress.progress(10)
-        log.write("Model loaded")
+        #log.write("Model loaded")
 
         # STEP 2 — Load embeddings
         embeddings_db = get_db_embeddings(df)
         progress.progress(30)
-        log.write(f"Embeddings loaded in {time.time() - t0:.2f}s")
+        #log.write(f"Embeddings loaded in {time.time() - t0:.2f}s")
 
         # STEP 3 — Load FAISS index
         t1 = time.time()
         index = get_faiss_index(embeddings_db)
         progress.progress(50)
-        log.write(f"FAISS index ready in {time.time() - t1:.2f}s")
+        #log.write(f"FAISS index ready in {time.time() - t1:.2f}s")
 
         # STEP 4 — Retrieve documents
         t2 = time.time()
         retrieved_rows = rag_retrieve_fast(query, model, index, df, top_k=8)
         progress.progress(70)
-        log.write(f"Retrieval done in {time.time() - t2:.2f}s")
+        #log.write(f"Retrieval done in {time.time() - t2:.2f}s")
 
         # STEP 5 — Build RAG docs
         t3 = time.time()
         rag_docs = build_rag_documents_from_rows(retrieved_rows)
         progress.progress(80)
-        log.write(f"Document formatting done in {time.time() - t3:.2f}s")
+        #log.write(f"Document formatting done in {time.time() - t3:.2f}s")
 
         # STEP 6 — LLM call
         t4 = time.time()
         prompt = build_rag_prompt(query, rag_docs)
         answer = rag_answer_with_llm(prompt, llm)
         progress.progress(100)
-        log.write(f"LLM answered in {time.time() - t4:.2f}s")
+        #log.write(f"LLM answered in {time.time() - t4:.2f}s")
 
         st.subheader("LMM response")
         st.write(answer)
