@@ -12,7 +12,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # ---------------------------------------------------------
-# 1. Chargement du dataset
+# 1. LOAD DATASET
 # ---------------------------------------------------------
 df = pd.read_csv("./src/movies_database.csv")
 
@@ -20,7 +20,7 @@ X_text = df["description"]
 y = df["category"]
 
 # ---------------------------------------------------------
-# 2. Split train/test
+# 2. TRAIN TEST SPLIT
 # ---------------------------------------------------------
 X_train, X_test, y_train, y_test = train_test_split(
     X_text,
@@ -34,7 +34,7 @@ print("Taille train :", len(X_train))
 print("Taille test  :", len(X_test))
 
 # ---------------------------------------------------------
-# 3. Vectorisation TF-IDF
+# 3. TF-IDF VECTORISATION
 # ---------------------------------------------------------
 vectorizer = TfidfVectorizer(
     stop_words="english",
@@ -46,7 +46,7 @@ X_train_vec = vectorizer.fit_transform(X_train)
 X_test_vec = vectorizer.transform(X_test)
 
 # ---------------------------------------------------------
-# 4. Modèle ML : Régression Logistique
+# 4. ML MODEL : LOGISTIC REGRESSION
 # ---------------------------------------------------------
 clf = LogisticRegression(
     max_iter=5000,
@@ -57,7 +57,7 @@ clf = LogisticRegression(
 clf.fit(X_train_vec, y_train)
 
 # ---------------------------------------------------------
-# 5. Prédictions & Évaluation
+# 5. ¨REDICTIONS AND EVALUATION
 # ---------------------------------------------------------
 y_pred = clf.predict(X_test_vec)
 
@@ -68,7 +68,7 @@ print("\nClassification Report :")
 print(classification_report(y_test, y_pred))
 
 # ---------------------------------------------------------
-# 6. Matrice de confusion
+# 6. CONFUSION MATRIX
 # ---------------------------------------------------------
 cm = confusion_matrix(y_test, y_pred, labels=clf.classes_)
 
@@ -88,9 +88,9 @@ plt.tight_layout()
 plt.show()
 
 # ---------------------------------------------------------
-# 7. Sauvegarde du modèle et du vectorizer
+# 7. SAVE MODEL AND VECTORIZER
 # ---------------------------------------------------------
 joblib.dump(clf, "./models/modele_ml_lr.joblib")
 joblib.dump(vectorizer, "./models/vectorizer2.joblib")
 
-print("\Modèle et vectorizer sauvegardés.")
+print("\Modèle et vectorizer saved.")

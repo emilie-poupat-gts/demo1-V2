@@ -14,10 +14,10 @@ def build_rag_documents(df):
     return docs
 
 def rag_retrieve(query, model, embeddings_db, df, top_k=5):
-    # Recherche sémantique classique
+    # Classic semantic seard
     results = semantic_search(df, query, model, embeddings_db, top_k=top_k)
 
-    # Convertir les résultats en documents textuels
+    # Convert results in text documents
     docs = []
     for _, row in results.iterrows():
         doc = (
@@ -35,16 +35,17 @@ def build_rag_prompt(question, retrieved_docs):
     context = "\n\n---\n\n".join(retrieved_docs)
 
     prompt = f"""
-Tu es un assistant expert en analyse de bases de films.
+You are an assistant specialized in cinema.
 
-Voici des extraits du dataset :
+Here are extracts from the dataset :
 
 {context}
 
-Question utilisateur :
+User question :
 {question}
 
-Analyse la question en t'appuyant uniquement sur les documents ci-dessus.
-Donne une réponse synthétique, structurée et précise.
+Analyze the question based only on the documents above. 
+Give a synthetic, structured and precise response.
+
 """
     return prompt

@@ -17,11 +17,11 @@ from core.search import (
     semantic_search_with_year_range
 )
 from core.embedding_helper import (
-    compute_embeddings  # NOTE: we no longer import load_model from here
+    compute_embeddings  
 )
 from core.config import llm, clf, vectorizer
 from core.rag import (
-    build_rag_prompt  # we’ll build docs directly here
+    build_rag_prompt  
 )
 
 # ---------------------------------------------------------
@@ -53,7 +53,7 @@ mode = st.sidebar.radio(
 )
 
 # ---------------------------------------------------------
-# CACHED MODEL, EMBEDDINGS & FAISS INDEX
+# CACHED MODEL, EMBEDDINGS AND FAISS INDEX
 # ---------------------------------------------------------
 @st.cache_resource
 def get_embedding_model(path: str = "./modelHF"):
@@ -227,24 +227,24 @@ elif mode == "RAG":
         progress = st.progress(0)
         log = st.empty()
 
-        # STEP 1 — Load model
+        # Load the embedding model
         t0 = time.time()
         model = get_embedding_model("./modelHF")
         progress.progress(10)
         #log.write("Model loaded")
 
-        # STEP 2 — Load embeddings
+        # Load embeddings
         embeddings_db = get_db_embeddings(df)
         progress.progress(30)
         #log.write(f"Embeddings loaded in {time.time() - t0:.2f}s")
 
-        # STEP 3 — Load FAISS index
+        # Load FAISS index
         t1 = time.time()
         index = get_faiss_index(embeddings_db)
         progress.progress(50)
         #log.write(f"FAISS index ready in {time.time() - t1:.2f}s")
 
-        # STEP 4 — Retrieve documents
+        # Retrieve documents
         t2 = time.time()
         retrieved_rows = rag_retrieve_fast(query, model, index, df, top_k=8)
         progress.progress(70)
@@ -256,7 +256,7 @@ elif mode == "RAG":
         progress.progress(80)
         #log.write(f"Document formatting done in {time.time() - t3:.2f}s")
 
-        # STEP 6 — LLM call
+        # Call LLM 
         t4 = time.time()
         prompt = build_rag_prompt(query, rag_docs)
         answer = rag_answer_with_llm(prompt, llm)

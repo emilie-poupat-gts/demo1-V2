@@ -1,4 +1,3 @@
-# --- Corpus and embeddings helpers ---------------------------------------
 def build_corpus(df, cols):
     corpus=[]
     for _, row in df.iterrows():
