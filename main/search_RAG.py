@@ -213,7 +213,32 @@ elif mode == " Semantic search":
             top_k=10,
             fallback_to_full=True
         )
-        display_results_semantic(results)
+
+        st.session_state["semantic_results"] = results
+    
+    if "semantic_results" in st.session_state:
+        results = st.session_state["semantic_results"]
+
+    # Filters after the semantic search 
+    categories = sorted(results["category"].unique())
+    selected_cat = st.multiselect("Filter by category", categories)
+
+    min_year, max_year = int(results["year"].min()), int(results["year"].max())
+    selected_years = st.slider("Filter by year", min_year, max_year, (min_year, max_year))
+
+    filtered = results.copy()
+
+    if selected_cat:
+        filtered = filtered[filtered["category"].isin(selected_cat)]
+
+    filtered = filtered[
+        (filtered["year"] >= selected_years[0]) &
+        (filtered["year"] <= selected_years[1])
+    ]
+
+    st.subheader("Filtered results")
+    st.dataframe(filtered, use_container_width=True)
+
 
 # ---------------------------------------------------------
 # MODE 5 — RAG
@@ -246,11 +271,11 @@ elif mode == "RAG":
 
         # Retrieve documents
         t2 = time.time()
-        retrieved_rows = rag_retrieve_fast(query, model, index, df, top_k=8)
+        retrieved_rows = rag_retrieve_fast(query, model, index, df, top_k=25)
         progress.progress(70)
         #log.write(f"Retrieval done in {time.time() - t2:.2f}s")
 
-        # STEP 5 — Build RAG docs
+        # Build RAG docs
         t3 = time.time()
         rag_docs = build_rag_documents_from_rows(retrieved_rows)
         progress.progress(80)
