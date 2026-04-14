@@ -83,7 +83,7 @@ if mode == " Add a document":
     if uploaded_file is not None:
         if st.button("Analyze and add to database"):
 
-            # 1. FAST TEXT EXTRACTION
+            # Text extraction
             with st.spinner("Extracting text..."):
                 try:
                     extracted_text = extract_text(uploaded_file)
@@ -93,7 +93,7 @@ if mode == " Add a document":
 
             if extracted_text:
 
-                # 2. FAST LLM ANALYSIS (SUMMARIZATION + SINGLE EXTRACTION)
+                # LLM analysis (summarization + extraction)
                 with st.spinner("Analyzing with LLM..."):
                     try:
                         llm_data = analyze_with_llm(extracted_text, llm)
@@ -105,7 +105,7 @@ if mode == " Add a document":
                     st.subheader("LLM Extracted Data:")
                     st.json(llm_data)
 
-                    # 3. ML ARBITRATION
+                    # ML arbitration
                     with st.spinner("Comparing with ML model..."):
                         desc_vec = vectorizer.transform([llm_data['description']])
                         probas = clf.predict_proba(desc_vec)[0]
@@ -140,7 +140,7 @@ if mode == " Add a document":
 
                         st.info(explanation)
 
-                    # 4. ADD TO DATABASE
+                    # Add to database
                     new_entry = {
                         "title": llm_data["title"],
                         "description": llm_data["description"],

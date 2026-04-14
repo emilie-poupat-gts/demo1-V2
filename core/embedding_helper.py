@@ -24,4 +24,3 @@ def compute_embeddings(df, cols, model, batch_size=64):
         show_progress_bar=False
     )
     return embeddings
-

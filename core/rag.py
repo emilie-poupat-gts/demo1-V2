@@ -44,8 +44,14 @@ Here are extracts from the dataset :
 User question :
 {question}
 
-Analyze the question based only on the documents above. 
-Give a synthetic, structured and precise response.
+Instructions :
+- Answer ONLY using the information from the documents above.
+- Do NOT assume these are all the documents in the database.
+- Do NOT state or imply how many documents match the query.
+- You MUST list the documents as bullet points to illustrate your answer as exemples and not because it's exhaustive
+- Add sentences to justify and explain your answer.
+- Mention all relevant documents found in the provided extracts.
+
 
 """
     return prompt
